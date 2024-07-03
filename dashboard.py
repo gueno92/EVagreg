@@ -14,12 +14,21 @@ st.set_page_config(layout="wide")
 # Sidebar for input sliders
 st.sidebar.title("User Input")
 
+charge_option = st.sidebar.selectbox(
+    "Select your charger",
+    ("Electra", "Wallbox", "Circontrol"))
+
+charging_type = st.sidebar.multiselect(
+    "Charging type",
+    ["V2G", "Smart", "Fast"])
+
 # State of charge data
 SOC_ini = st.sidebar.slider(f'Initial State of Charge', 0, 100, 50)
 SOC_final = st.sidebar.slider(f'Desired State of Charge', 0, 100, 95)
     
 
-start_time = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
+#start_time = datetime.now().replace(hour=18, minute=0, second=0, microsecond=0)
+start_time = datetime(2024, 6, 19, 18, 00)
 end_time = start_time + timedelta(days=1, hours=-1)
 
 # Create the slider charging schedule timeline
@@ -27,7 +36,7 @@ charging_schedule = st.sidebar.slider(
     "Schedule your charging schedule:",
     min_value=start_time,
     max_value=end_time,
-    value=(start_time + timedelta(hours=0, minutes=0), start_time + timedelta(hours=5, minutes=45)),
+    value=(start_time + timedelta(hours=0, minutes=0), start_time + timedelta(hours=5, minutes=40)),
     step=timedelta(minutes=10),
     format="MM/DD HH:mm"
 )
@@ -40,6 +49,7 @@ Batt = EV_BATTERY(P_charg=46, capacity=62, P_dischar=7, eta = 0.8, n_EV=3)
 
 Batt.read_spot_price('Price_data/bourseEpex_06_06_2024.csv', resample=True)
 Batt.reformate_charing_time(charging_schedule)
+Batt.definec_charger_charac(charge_type=charge_option)
 
 print(Batt.start_pos)
 print(Batt.len_ones)
@@ -58,9 +68,17 @@ charge, discharge, SOC = Batt.battery_dispatch('VPP')
 total_price_ls.append(Batt.obj_value)
 charge_smart, discharge_smart, SOC_smart = Batt.battery_dispatch('smart')
 total_price_ls.append(Batt.obj_value)
+df_Smart = Batt.generate_result_df()
 charge_fast, discharge_fast, SOC_fast = Batt.battery_dispatch('fast')
 total_price_ls.append(Batt.obj_value)
+df_fast = Batt.generate_result_df()
 
+#Compute the electra price
+price_electra = 0.49*62*(SOC_final - SOC_ini)/100
+total_price_ls.append(price_electra)
+
+dict_df = {'V2G': df_VPP, 'Smart': df_Smart, 
+           'Fast': df_fast}
 
 # Main dashboard layout
 col1, col2 = st.columns(2)
@@ -84,7 +102,7 @@ col2.subheader("Comparison of the charging method")
 #ax.set_ylabel('Price [$]')
 
 
-data_price = pd.DataFrame({'Price [$]' : total_price_ls, 'Method': ['V2G', 'Smart', 'Fast']})
+data_price = pd.DataFrame({'Price [$]' : total_price_ls, 'Method': ['V2G', 'Smart', 'Fast', 'Electra']})
 fig = px.bar(data_price, x='Method', y='Price [$]')
 
 #col2.pyplot(fig)
@@ -102,10 +120,15 @@ fig.add_trace(
     go.Scatter(x=df_VPP['Time'], y=df_VPP['Price [$/MWh]'], name="Price [$/MWh]", mode='lines+markers', yaxis="y1")
 )
 
-# Add scatter plot for 'SOC'
-fig.add_trace(
-    go.Scatter(x=df_VPP['Time'], y=df_VPP['SOC 0'], name="SOC", mode='lines+markers', yaxis="y2")
-)
+
+for elem in charging_type:
+    df = dict_df[elem]
+    # Add scatter plot for 'SOC'
+    fig.add_trace(
+        go.Scatter(x=df['Time'], y=df['SOC 0'], name=f"SOC {elem}", mode='lines+markers', yaxis="y2")
+    )
+
+
 
 # Create axis objects
 fig.update_layout(
@@ -129,7 +152,7 @@ fig.update_layout(
 
 # Update layout
 fig.update_layout(
-    legend=dict(x=0, y=1),
+    legend=dict(x=0.85, y=0),
     margin=dict(l=40, r=40, t=40, b=40)
 )
 
