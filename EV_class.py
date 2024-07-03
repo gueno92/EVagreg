@@ -47,6 +47,27 @@ class EV_BATTERY:
             self.price_ls = resampled_list
 
         self.T = len(self.price_ls)
+    
+    def definec_charger_charac(self,
+                               charge_type: str = 'Electra'):
+        """
+        Method that define the characteristic of the charging
+        point
+
+        Args : 
+        charge_type (str) : Choose one type in the list 'Electra' , 'Wallbox'
+        """
+
+        if charge_type == 'Electra':
+            # Ref : https://www.go-electra.com/en/landowner/
+            self.P_charg_point = 150
+        elif charge_type == 'Wallbox':
+            # Ref : https://www.monkitsolaire.fr/blog/meilleure-borne-de-recharge
+            self.P_charg_point = 22
+        elif charge_type == 'Circontrol':
+            # Ref : https://www.monkitsolaire.fr/blog/meilleure-borne-de-recharge
+            self.P_charg_point = 7.4
+        
 
     def reformate_charing_time(self,
                                charging_schedule):
@@ -187,6 +208,7 @@ class EV_BATTERY:
             for k in range(self.n_EV):
                 model.addConstr(x_dch[t,k] <= x_dispatch[t,k]*x_soc[t,k]*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
                 model.addConstr(x_dch[t,k] <= x_dispatch[t,k]*self.P_dischar * self.schedule_matrix[t,k])
+                model.addConstr(x_dch[t,k] <= self.P_charg_point)
         
 
         # Constraints (2)
@@ -195,6 +217,7 @@ class EV_BATTERY:
             for k in range(self.n_EV):
                 model.addConstr(x_ch[t,k] <= (1-x_dispatch[t,k])*(1-x_soc[t,k])*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
                 model.addConstr(x_ch[t,k] <= (1-x_dispatch[t,k])*self.P_charg * self.schedule_matrix[t,k])
+                model.addConstr(x_ch[t,k] <= self.P_charg_point)
 
 
 
