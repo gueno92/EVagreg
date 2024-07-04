@@ -170,7 +170,7 @@ class EV_BATTERY:
         from RTE
 
         Args:
-        charging_type (str) : smart, VPP, fast 
+        charging_type (str) : smart, VPP, fast, aFRR biding 
         """
         #Time over which to dispatch
         T = len(self.price_ls)
@@ -200,6 +200,37 @@ class EV_BATTERY:
             model.setObjective(quicksum(quicksum(((x_soc[i,k]))
                                     for i in range(T)) 
                                     for k in range(self.n_EV)), GRB.MAXIMIZE)
+            
+        elif charging_type == 'aFRR':
+            vol_bids_up = model.addVars(T, lb=0.0,vtype=GRB.CONTINUOUS, name="bid_up") # bids up on aFFR in volume
+            vol_bids_down = model.addVars(T, lb=0.0, vtype=GRB.CONTINUOUS, name="bid_down") # bids down on aFFR in volume
+            bid_up = model.addVars(T, vtype=GRB.BINARY, name="bid_up") # bids up on aFFR in volume
+            bid_down = model.addVars(T, vtype=GRB.BINARY, name="bid_down") # bids up on aFFR in volume
+
+            # Set objective
+            model.setObjective(quicksum(quicksum((- x_ch[i,k] + x_dch[i,k]*self.eta)*self.price_ls[i]*self.delta_T*10**-3
+                                    for i in range(T)) 
+                                    for k in range(self.n_EV)) +
+                                    quicksum(bid_up[i]*vol_bids_up[i]*self.price_ls_aFFR_up[i] + 
+                                             bid_down[i]*vol_bids_down[i]*self.price_ls_aFFR_down[i] for i in range(T)) , GRB.MAXIMIZE)
+            
+            # Constraints for aFFR bid
+            for t in range(T):
+                # (1) Cannot bid up and down at the same time
+                model.addConstr(bid_up[t] + bid_down[t] <2 )
+
+                # (2) Cannot bid more than all available energy
+                model.addConstr( vol_bids_up[t] <= bid_up[t] * 
+                                quicksum( x_soc[t,k] *self.capacity for k in range(self.n_EV)))
+                
+                # (3) Cannot bid down more than what EV can handle
+                model.addConstr( vol_bids_down[t] <= bid_down[t] * 
+                                quicksum( (1- x_soc[t,k]) *self.capacity for k in range(self.n_EV)))
+                
+                # (4) bid needs to be dispatch
+                model.addConstr( vol_bids_down[t]*bid_down[t] <= quicksum(x_ch[t,k] for k in range(self.n_EV)))
+                model.addConstr( vol_bids_up[t]*bid_up[t] <= quicksum(x_dch[t,k] for k in range(self.n_EV)))
+
 
 
         # Constraints (1)
