@@ -224,7 +224,7 @@ class EV_BATTERY:
 
         # Model declaration
         model = Model("battery")
-        model.setParam("TimeLimit", 60) 
+        model.setParam("TimeLimit", 5) 
 
 
         # Decision variables
@@ -373,7 +373,7 @@ class EV_BATTERY:
 
         while current_date <= end_price_date:
             date_list.append(current_date)
-            current_date += timedelta(minutes=10)
+            current_date += timedelta(minutes=15)
 
 
         # Create the initial df with the SOC

@@ -20,8 +20,10 @@ charge_option = st.sidebar.selectbox(
 
 charging_type = st.sidebar.multiselect(
     "Charging type",
-    ["V2G", "Smart", "Fast"])
+    ["V2G", "Smart", "Fast", "aFRR"])
 
+n_EV_input = st.sidebar.number_input("Insert a number")
+n_EV = int(n_EV_input)
 # State of charge data
 SOC_ini = st.sidebar.slider(f'Initial State of Charge', 0, 100, 50)
 SOC_final = st.sidebar.slider(f'Desired State of Charge', 0, 100, 95)
@@ -37,7 +39,7 @@ charging_schedule = st.sidebar.slider(
     min_value=start_time,
     max_value=end_time,
     value=(start_time + timedelta(hours=0, minutes=0), start_time + timedelta(hours=5, minutes=40)),
-    step=timedelta(minutes=10),
+    step=timedelta(minutes=15),
     format="MM/DD HH:mm"
 )
 
@@ -45,17 +47,22 @@ charging_schedule = st.sidebar.slider(
 #============= Run simulation ========================================================
 #=====================================================================================
 
-Batt = EV_BATTERY(P_charg=46, capacity=62, P_dischar=7, eta = 0.8, n_EV=3)
+Batt = EV_BATTERY(P_charg=46, capacity=62, P_dischar=7, eta = 0.8, n_EV=n_EV)
 
-Batt.read_spot_price('Price_data/bourseEpex_06_06_2024.csv', resample=True)
+# Define the start and end datetime for the range
+date_range = [pd.to_datetime('06/06/2024 18:00', format='%d/%m/%Y %H:%M'), 
+              pd.to_datetime('07/07/2024 18:00', format='%d/%m/%Y %H:%M')]
+
+Batt.read_spot_price('Price_data/bourseEpex_06_06_2024.csv', resample=True, sampling =4)
+Batt.read_aFFR_price('Price_data/aFRR_06_06_2024.csv', date_range=date_range)
 Batt.reformate_charing_time(charging_schedule)
 Batt.definec_charger_charac(charge_type=charge_option)
 
 print(Batt.start_pos)
 print(Batt.len_ones)
 Batt.generate_contiguous_matrix(SOC_random=False,
-                                         SOC_ini= SOC_ini/100*np.ones((3,)),
-                                         SOC_final= SOC_final/100*np.ones((3,)))
+                                         SOC_ini= SOC_ini/100*np.ones((n_EV,)),
+                                         SOC_final= SOC_final/100*np.ones((n_EV,)))
 charge, discharge, SOC = Batt.battery_dispatch('VPP')
 # Generate the df only for the VPP
 df_VPP = Batt.generate_result_df()
@@ -64,21 +71,28 @@ total_price= Batt.obj_value
 
 #Look at the other benchmark
 total_price_ls = []
+#VPP
 charge, discharge, SOC = Batt.battery_dispatch('VPP')
 total_price_ls.append(Batt.obj_value)
+#V1G
 charge_smart, discharge_smart, SOC_smart = Batt.battery_dispatch('smart')
 total_price_ls.append(Batt.obj_value)
 df_Smart = Batt.generate_result_df()
+#Fast
 charge_fast, discharge_fast, SOC_fast = Batt.battery_dispatch('fast')
 total_price_ls.append(Batt.obj_value)
 df_fast = Batt.generate_result_df()
+#VPP + aFRR
+charge_aFRR, discharge_aFRR, SOC_aFRR = Batt.battery_dispatch('aFRR')
+total_price_ls.append(-Batt.obj_value)
+df_aFRR = Batt.generate_result_df()
 
 #Compute the electra price
 price_electra = 0.49*62*(SOC_final - SOC_ini)/100
 total_price_ls.append(price_electra)
 
 dict_df = {'V2G': df_VPP, 'Smart': df_Smart, 
-           'Fast': df_fast}
+           'Fast': df_fast, 'aFRR': df_aFRR}
 
 # Main dashboard layout
 col1, col2 = st.columns(2)
@@ -102,7 +116,7 @@ col2.subheader("Comparison of the charging method")
 #ax.set_ylabel('Price [$]')
 
 
-data_price = pd.DataFrame({'Price [$]' : total_price_ls, 'Method': ['V2G', 'Smart', 'Fast', 'Electra']})
+data_price = pd.DataFrame({'Price [$]' : total_price_ls, 'Method': ['V2G', 'Smart', 'Fast', 'aFRR','Electra']})
 fig = px.bar(data_price, x='Method', y='Price [$]')
 
 #col2.pyplot(fig)
