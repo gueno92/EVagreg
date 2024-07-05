@@ -29,25 +29,72 @@ class EV_BATTERY:
 
 
     def read_spot_price(self, path_to_price : str, 
-                        resample = False):
+                        resample = False,
+                        sampling = 6):
         """
         Read the df of price
         """
-        df_price = pd.read_csv(path_to_price)
+        df_price_spot = pd.read_csv(path_to_price)
 
-        self.price_ls = df_price['Prix (€/MWh)']
+        self.price_ls = df_price_spot['Prix (€/MWh)']
         self.delta_T =1
         self.time_step = 60
         if resample :
-            self.delta_T = 1/6
+            self.delta_T = 1/sampling
             self.time_step = 60*self.delta_T
             resampled_list = []
             for elem in self.price_ls:
-                resampled_list.extend([elem] * 6)
+                resampled_list.extend([elem] * sampling)
             self.price_ls = resampled_list
 
         self.T = len(self.price_ls)
-    
+
+    def read_aFFR_price(self, path_to_aFFR : str,
+                        date_range : list):
+        """
+        Read the aFRR price data in the date range indicated 
+        in the function 
+
+        Args  :
+        path_to_aFFR (str) : csv file from RTE with the data
+        date_range (list) : list of string containing the date range to consider
+        """
+
+        df_aFRR_price = pd.read_csv(path_to_aFFR)
+        
+        # Split the column into two columns
+        df_aFRR_price[['Start Time', 'End Time']] = df_aFRR_price['ISP CET/CEST'].str.split(' - ', expand=True)
+
+        # Convert to datetime
+        df_aFRR_price['Start Time'] = pd.to_datetime(df_aFRR_price['Start Time'], format='%d/%m/%Y %H:%M:%S')
+        df_aFRR_price['End Time'] = pd.to_datetime(df_aFRR_price['End Time'], format='%d/%m/%Y %H:%M:%S')
+
+
+        # Define the start and end datetime for the range
+        start_date = pd.to_datetime(date_range[0], format='%d/%m/%Y %H:%M')
+        end_date = pd.to_datetime(date_range[1], format='%d/%m/%Y %H:%M')
+
+
+        # Filter the dataframe to keep rows within the date range
+        filtered_df = df_aFRR_price[(df_aFRR_price['Start Time'] >= start_date) & (df_aFRR_price['Start Time'] <= end_date)]
+
+
+        filtered_df['Price Up (EUR/MWh)'] = filtered_df['Price Up (EUR/MWh)'].replace(' ', '0')
+        filtered_df['Price Up (EUR/MWh)'] = filtered_df['Price Up (EUR/MWh)'].replace('', '0')
+        filtered_df['Price Down (EUR/MWh)'] = filtered_df['Price Down (EUR/MWh)'].replace(' ','0')
+        filtered_df['Price Down (EUR/MWh)'] = filtered_df['Price Down (EUR/MWh)'].replace('','0')
+
+        filtered_df['Price Up (EUR/MWh)'] = filtered_df['Price Up (EUR/MWh)'].astype(float)
+        filtered_df['Price Down (EUR/MWh)'] = filtered_df['Price Down (EUR/MWh)'].astype(float)
+        # Save the data in the list
+        self.price_ls_aFFR_up = filtered_df['Price Up (EUR/MWh)'].values
+        self.price_ls_aFFR_down = filtered_df['Price Down (EUR/MWh)'].values
+
+        for elem in filtered_df['Price Up (EUR/MWh)'].values:
+            print(elem)
+        for elem_1 in self.price_ls_aFFR_up:
+            print(elem_1)
+
     def definec_charger_charac(self,
                                charge_type: str = 'Electra'):
         """
@@ -177,6 +224,7 @@ class EV_BATTERY:
 
         # Model declaration
         model = Model("battery")
+        model.setParam("TimeLimit", 60) 
 
 
         # Decision variables
@@ -204,20 +252,20 @@ class EV_BATTERY:
         elif charging_type == 'aFRR':
             vol_bids_up = model.addVars(T, lb=0.0,vtype=GRB.CONTINUOUS, name="bid_up") # bids up on aFFR in volume
             vol_bids_down = model.addVars(T, lb=0.0, vtype=GRB.CONTINUOUS, name="bid_down") # bids down on aFFR in volume
-            bid_up = model.addVars(T, vtype=GRB.BINARY, name="bid_up") # bids up on aFFR in volume
-            bid_down = model.addVars(T, vtype=GRB.BINARY, name="bid_down") # bids up on aFFR in volume
+            bid_up = model.addVars(T, vtype=GRB.BINARY, name="bid_up") # decision to bid up
+            bid_down = model.addVars(T, vtype=GRB.BINARY, name="bid_down") # decision to bid down
 
             # Set objective
             model.setObjective(quicksum(quicksum((- x_ch[i,k] + x_dch[i,k]*self.eta)*self.price_ls[i]*self.delta_T*10**-3
                                     for i in range(T)) 
                                     for k in range(self.n_EV)) +
-                                    quicksum(bid_up[i]*vol_bids_up[i]*self.price_ls_aFFR_up[i] + 
-                                             bid_down[i]*vol_bids_down[i]*self.price_ls_aFFR_down[i] for i in range(T)) , GRB.MAXIMIZE)
+                                    quicksum((bid_up[i]*vol_bids_up[i]*self.price_ls_aFFR_up[i] + 
+                                             bid_down[i]*vol_bids_down[i]*self.price_ls_aFFR_down[i])*self.delta_T*10**-3 for i in range(T)) , GRB.MAXIMIZE)
             
             # Constraints for aFFR bid
             for t in range(T):
                 # (1) Cannot bid up and down at the same time
-                model.addConstr(bid_up[t] + bid_down[t] <2 )
+                model.addConstr(bid_up[t] + bid_down[t] <= 1 )
 
                 # (2) Cannot bid more than all available energy
                 model.addConstr( vol_bids_up[t] <= bid_up[t] * 
@@ -230,6 +278,11 @@ class EV_BATTERY:
                 # (4) bid needs to be dispatch
                 model.addConstr( vol_bids_down[t]*bid_down[t] <= quicksum(x_ch[t,k] for k in range(self.n_EV)))
                 model.addConstr( vol_bids_up[t]*bid_up[t] <= quicksum(x_dch[t,k] for k in range(self.n_EV)))
+
+                # (5) need to bid at least 1MW up and down
+                model.addConstr( vol_bids_down[t] >= 1*bid_down[t])
+                model.addConstr( vol_bids_up[t] >= 1*bid_up[t])
+
 
 
 
@@ -269,10 +322,10 @@ class EV_BATTERY:
         #Solve the model
         model.optimize()
 
-        # Electrolizer state
+        # Charge state
         charge = np.zeros((T,self.n_EV))
         
-        #Power of each electrolizer
+        #Power of each EV battery
         discharge = np.zeros((T,self.n_EV))
         SOC = np.zeros((T,self.n_EV))
 
@@ -283,7 +336,7 @@ class EV_BATTERY:
                 discharge[j,k] = x_dch[j,k].X
                 SOC[j,k] = x_soc[j,k].X
 
-        if charging_type in ['VPP', 'smart']:
+        if charging_type in ['VPP', 'smart', 'aFRR']:
             obj = model.getObjective()
             self.obj_value = obj.getValue()
             print(f'Objective value for {charging_type} = {self.obj_value}')
@@ -292,6 +345,13 @@ class EV_BATTERY:
             for k in range(self.n_EV):
                 self.obj_value += np.sum(charge[:,k]*self.price_ls[:]*self.delta_T*10**-3)
             print(f'Objective value for {charging_type} = {self.obj_value}')
+
+        if charging_type == 'aFRR':
+            self.bid_up_ls = np.zeros((T,))
+            self.bid_down_ls = np.zeros((T,))
+            for t in range(T):
+                self.bid_up_ls[t] = vol_bids_up[t].X
+                self.bid_down_ls[t] = vol_bids_down[t].X
 
         self.SOC = SOC
         return charge, discharge, SOC
