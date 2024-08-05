@@ -22,6 +22,14 @@ charging_type = st.sidebar.multiselect(
     "Charging type",
     ["V2G", "Smart", "Fast", "aFRR"])
 
+schedule_type = st.sidebar.selectbox(
+    "Select your schedule type",
+    ('deterministic', 'robust+known start', 'robsut+random', 'fully random'))
+
+SOC_type = st.sidebar.selectbox(
+    "Select your SOC type",
+    ('deterministic', 'random'))
+
 n_EV_input = st.sidebar.number_input("Insert a number")
 n_EV = int(n_EV_input)
 # State of charge data
@@ -53,16 +61,22 @@ Batt = EV_BATTERY(P_charg=46, capacity=62, P_dischar=7, eta = 0.8, n_EV=n_EV)
 date_range = [pd.to_datetime('06/06/2024 18:00', format='%d/%m/%Y %H:%M'), 
               pd.to_datetime('07/07/2024 18:00', format='%d/%m/%Y %H:%M')]
 
-Batt.read_spot_price('Price_data/bourseEpex_06_06_2024.csv', resample=True, sampling =4)
-Batt.read_aFFR_price('Price_data/aFRR_06_06_2024.csv', date_range=date_range)
-Batt.reformate_charing_time(charging_schedule)
+Batt.define_path_and_inputs(path_to_price = 'Price_data/bourseEpex_06_06_2024.csv',
+                           path_to_aFFR = 'Price_data/aFRR_06_06_2024.csv',
+                           path_parking_data = 'Charging_data/NREL/data_for_fleet_dna_delivery_vans_shift_filter.csv',
+                           charging_schedule = charging_schedule,
+                            SOC_ini = SOC_ini/100*np.ones((n_EV,)),
+                            SOC_final = SOC_final/100*np.ones((n_EV,)))
+
+Batt.read_spot_price(resample=True, sampling =4)
+Batt.read_aFFR_price(date_range=date_range)
+Batt.reformate_charing_time()
 Batt.definec_charger_charac(charge_type=charge_option)
 
-print(Batt.start_pos)
-print(Batt.len_ones)
-Batt.generate_contiguous_matrix(SOC_random=False,
-                                         SOC_ini= SOC_ini/100*np.ones((n_EV,)),
-                                         SOC_final= SOC_final/100*np.ones((n_EV,)))
+Batt.build_charging_schedule(schedule_type = schedule_type)
+Batt.create_SOC(SOC_type=SOC_type)
+
+
 charge, discharge, SOC = Batt.battery_dispatch('VPP')
 # Generate the df only for the VPP
 df_VPP = Batt.generate_result_df()
@@ -105,15 +119,6 @@ col1.metric(label="Desired SOC [%]", value=SOC_final)
 
 # Top-right: Bar plot
 col2.subheader("Comparison of the charging method")
-#fig, ax = plt.subplots(figsize = (4,3), dpi = 300)
-#bars = ax.bar(['VPP', 'Smart', 'Fast'], total_price_ls)
-#ax.set_ylim(np.min(total_price_ls)*1.15, np.max(total_price_ls)*1.15)
-# Adding annotations
-#for bar, value in zip(bars, total_price_ls):
-  #  height = np.round(bar.get_height(),2)
-  #  print(height)
- #   ax.text(bar.get_x() + bar.get_width() / 2.0, height, f'{np.round(value,2)}', ha='center', va='bottom')
-#ax.set_ylabel('Price [$]')
 
 
 data_price = pd.DataFrame({'Price [$]' : total_price_ls, 'Method': ['V2G', 'Smart', 'Fast', 'aFRR','Electra']})

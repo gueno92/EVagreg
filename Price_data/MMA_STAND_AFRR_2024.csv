@@ -1,4 +1,4 @@
-Heure de début,Heure de fin,Besoin en aFRR hausse exprimé par RTE (en MW),Besoin en aFRR baisse exprimé par RTE (en MW),Volume daFRR à la hausse activé pour la France (en MW),Volume daFRR à la baisse activé pour la France (en MW),Prix Moyen Pondéré d'aFRR activée à la hausse pour la France (en Euros/MWh),Prix Moyen Pondéré d'aFRR activée à la baisse pour la France (en Euros/MWh),Volume d'aFRR à la hausse activé en France (en MW),Volume d'aFRR à la baisse activé en France (en MW)
+Heure de début,Heure de fin,Besoin en aFRR hausse exprimé par RTE (en MW),Besoin en aFRR baisse exprimé par RTE (en MW),Volume daFRR à la hausse activé pour la France (en MW),Volume daFRR à la baisse activé pour la France (en MW),Prix Moyen Pondéré daFRR activée à la hausse pour la France (en Euros/MWh),Prix Moyen Pondéré daFRR activée à la baisse pour la France (en Euros/MWh),Volume daFRR à la hausse activé en France (en MW),Volume daFRR à la baisse activé en France (en MW)
 01/06/2024 00:00,01/06/2024 00:15,1017,0,527,0,124.41,25.51,527,0
 01/06/2024 00:15,01/06/2024 00:30,1437,0,855,0,131.70,43.30,855,0
 01/06/2024 00:30,01/06/2024 00:45,678,2,282,18,8.13,10.40,282,18

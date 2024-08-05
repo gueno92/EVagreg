@@ -27,14 +27,35 @@ class EV_BATTERY:
         self.eta = eta
         self.n_EV = n_EV
 
+    def define_path_and_inputs(self,
+                           path_to_price: str,
+                           path_to_aFFR: str,
+                           path_parking_data: str,
+                           charging_schedule: tuple,
+                            SOC_ini: np.array,
+                            SOC_final: np.array):
+        """
+        Define the path to the important csv files and the inputs from
+        the web app
 
-    def read_spot_price(self, path_to_price : str, 
+        Args : 
+
+            charging_schedule : tuple of datetime object of format "MM/DD HH:mm"
+        """
+        self.path_to_price = path_to_price
+        self.path_to_aFFR = path_to_aFFR
+        self.path_parking_data = path_parking_data
+        self.charging_schedule = charging_schedule
+        self.SOC_ini_read = SOC_ini
+        self.SOC_final_read =SOC_final
+
+    def read_spot_price(self, 
                         resample = False,
                         sampling = 6):
         """
         Read the df of price
         """
-        df_price_spot = pd.read_csv(path_to_price)
+        df_price_spot = pd.read_csv(self.path_to_price)
 
         self.price_ls = df_price_spot['Prix (€/MWh)']
         self.delta_T =1
@@ -49,7 +70,7 @@ class EV_BATTERY:
 
         self.T = len(self.price_ls)
 
-    def read_aFFR_price(self, path_to_aFFR : str,
+    def read_aFFR_price(self,
                         date_range : list):
         """
         Read the aFRR price data in the date range indicated 
@@ -60,7 +81,7 @@ class EV_BATTERY:
         date_range (list) : list of string containing the date range to consider
         """
 
-        df_aFRR_price = pd.read_csv(path_to_aFFR)
+        df_aFRR_price = pd.read_csv(self.path_to_aFFR)
         
         # Split the column into two columns
         df_aFRR_price[['Start Time', 'End Time']] = df_aFRR_price['ISP CET/CEST'].str.split(' - ', expand=True)
@@ -116,8 +137,7 @@ class EV_BATTERY:
             self.P_charg_point = 7.4
         
 
-    def reformate_charing_time(self,
-                               charging_schedule):
+    def reformate_charing_time(self):
         """
         Reformate the charging schedule to make it suitable with 
         the optimization process
@@ -127,27 +147,70 @@ class EV_BATTERY:
         """
         start_price_date = datetime(2024, 6, 19, 18, 00)
         #Determine the start position for the optimization
-        detla_time_start = charging_schedule[0] - start_price_date
+        detla_time_start = self.charging_schedule[0] - start_price_date
         # for now the steps are of 10 minutes
         start_pos = int(detla_time_start.total_seconds()/(60*self.time_step))
 
 
         # Determine the charging duration 
-        detla_time_charge = charging_schedule[1] -  charging_schedule[0]
+        detla_time_charge = self.charging_schedule[1] -  self.charging_schedule[0]
         duration_charging = int(detla_time_charge.total_seconds()/(60*self.time_step))
 
         # Store everything in the object
         self.len_ones = duration_charging
         self.start_pos = start_pos
 
+    def robust_parked_time(self,
+                           confidence_level:int = 2):
+        """
+        Method that derive the statistic of the parked time,
+        used to define the uncertainties set of the robust optimization 
+        method
+
+        Args:
+            path_parking_data (str) : path to the NREL data
+        """
+
+        df_parked_time = pd.read_csv(self.path_parking_data)
+
+        #Mean and std in hours of time parked
+        mu = np.mean(df_parked_time['Rolling_diff'])
+        sigma = np.std(df_parked_time['Rolling_diff'])
+
+        worst_duration_charging = int((mu - confidence_level*sigma)*3600/(60*self.time_step))
+
+        # Store everything in the object
+        self.len_ones = worst_duration_charging
+ 
+    def build_charging_schedule(self,
+                                schedule_type: str):
+        """
+        Method that build the charging schedule based on different option
+
+        Args : 
+            schedule_type (str) : need to be 'deterministic', 'robust+known start',
+                                'robust + fully random', 'fully random'
+        """
+        rows = self.T
+        cols = self.n_EV
+        matrix = np.zeros((rows, cols), dtype=int)
+
+        # generate the matrix based on the schedule type
+        for col in range(cols):
+                matrix[:, col] = self.generate_contiguous_list(schedule_type)
+
+        self.schedule_matrix = matrix
+
 
     def generate_contiguous_list(self,
-                                 random: bool = True):
+                                 schedule_type: str):
         """
-        Generates a list with contiguous blocks of 1s and 0s where the series of 1s starts at a random position and has a random length.
+        Generates a list with contiguous blocks of 1s and 0s where the series
+        of 1s starts at a random position and has a random length.
         
         Parameters:
-        random (bool): Have random time of stay or not.
+        schedule_type (str): type of charging schedule needs to be 'deterministic',
+                            'robust+known start', 'robsut+random', 'fully random'
         
         Returns:
         list: The generated list.
@@ -156,26 +219,57 @@ class EV_BATTERY:
         if length <= 1:
             raise ValueError("Length of the list must be greater than 1.")
         
-        if random : 
+
+        if schedule_type == 'deterministic':
+            #If not random => call the function reformate_charging_time 
+            # to create the contiguous list with the random length
+            self.reformate_charing_time()
+
+        elif schedule_type == 'robust+known start':
+            # Read the charging data
+            self.reformate_charing_time()
+            # Create the robust layer
+            self.robust_parked_time()
+
+        elif schedule_type == 'robsut+random':
+            # Create the robust layer
+            self.robust_parked_time()
+            # Determine the starting position for the series of 1s
+            self.start_pos = random.randint(0, length - self.len_ones)
+
+        elif schedule_type == 'fully random':
             # Determine the length of the series of 1s
             self.len_ones = random.randint(1, length - 1)
             # Determine the starting position for the series of 1s
             self.start_pos = random.randint(0, length - self.len_ones)
-        
-        else : 
-            print('Not random')
 
-        
         # Generate the list with contiguous blocks of 1s and 0s
         ls = [0] * length
         for i in range(self.len_ones):
             ls[self.start_pos + i] = 1
         return ls
 
+    def create_SOC(self,
+                   SOC_type : str):
+        """
+        Method to read the SOC 
+        """
+
+        if SOC_type == 'deterministic':
+            # Read directly from the dashboard
+            self.SOC_ini =  self.SOC_ini_read
+            self.SOC_final =  self.SOC_final_read
+        
+        elif SOC_type == 'random':
+            self.SOC_ini = np.random.uniform(low=0.0, high=1.0, size= (self.n_EV,))
+            self.SOC_final = np.ones((self.n_EV,))
+
     def generate_contiguous_matrix(self,
                                    SOC_random:bool = True,
                                    SOC_ini = None,
-                                   SOC_final = None):
+                                   SOC_final = None,
+                                   data_driven = False,
+                                   random_schedule = False):
         """
         Generates a matrix with contiguous blocks of 1s and 0s in each column.
         
@@ -203,7 +297,7 @@ class EV_BATTERY:
             self.SOC_final =  SOC_final
 
             for col in range(cols):
-                matrix[:, col] = self.generate_contiguous_list(random=False)
+                matrix[:, col] = self.generate_contiguous_list(random_schedule=random_schedule, data_driven=data_driven)
 
 
         self.schedule_matrix = matrix
@@ -290,7 +384,7 @@ class EV_BATTERY:
         # Cannot discharge more than the available energy
         for t in range(T):
             for k in range(self.n_EV):
-                model.addConstr(x_dch[t,k] <= x_dispatch[t,k]*x_soc[t,k]*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
+                model.addConstr(x_dch[t,k] <= x_soc[t,k]*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
                 model.addConstr(x_dch[t,k] <= x_dispatch[t,k]*self.P_dischar * self.schedule_matrix[t,k])
                 model.addConstr(x_dch[t,k] <= self.P_charg_point)
         
@@ -299,7 +393,7 @@ class EV_BATTERY:
         # Cannot charge more than available and cannot charge while dispatching
         for t in range(T): 
             for k in range(self.n_EV):
-                model.addConstr(x_ch[t,k] <= (1-x_dispatch[t,k])*(1-x_soc[t,k])*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
+                model.addConstr(x_ch[t,k] <= (1-x_soc[t,k])*self.capacity * self.schedule_matrix[t,k]/self.delta_T)
                 model.addConstr(x_ch[t,k] <= (1-x_dispatch[t,k])*self.P_charg * self.schedule_matrix[t,k])
                 model.addConstr(x_ch[t,k] <= self.P_charg_point)
 
