@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from datetime import time
 from datetime import datetime, timedelta
 from EV_class import EV_BATTERY
+from RTE_API import RTE_API
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -66,7 +67,8 @@ Batt.define_path_and_inputs(path_to_price = 'Price_data/bourseEpex_06_06_2024.cs
                            path_parking_data = 'Charging_data/NREL/data_for_fleet_dna_delivery_vans_shift_filter.csv',
                            charging_schedule = charging_schedule,
                             SOC_ini = SOC_ini/100*np.ones((n_EV,)),
-                            SOC_final = SOC_final/100*np.ones((n_EV,)))
+                            SOC_final = SOC_final/100*np.ones((n_EV,)),
+                            price_API = True)
 
 Batt.read_spot_price(resample=True, sampling =4)
 Batt.read_aFFR_price(date_range=date_range)

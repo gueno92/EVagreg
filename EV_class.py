@@ -4,8 +4,9 @@ from gurobipy import Model, GRB, quicksum
 import matplotlib.pyplot as plt
 import random
 from datetime import datetime, timedelta
+from RTE_API import *
 
-class EV_BATTERY:
+class EV_BATTERY(RTE_API):
     
     def __init__(self, P_charg: float,
                 capacity: float,
@@ -20,6 +21,7 @@ class EV_BATTERY:
         capacity (float) : battery storage capacity
         P_dischar (float) : discharge capacity
         """
+        super().__init__()
         np.random.seed(0)
         self.P_charg = P_charg
         self.capacity = capacity
@@ -33,7 +35,8 @@ class EV_BATTERY:
                            path_parking_data: str,
                            charging_schedule: tuple,
                             SOC_ini: np.array,
-                            SOC_final: np.array):
+                            SOC_final: np.array,
+                            price_API: bool = False):
         """
         Define the path to the important csv files and the inputs from
         the web app
@@ -48,6 +51,7 @@ class EV_BATTERY:
         self.charging_schedule = charging_schedule
         self.SOC_ini_read = SOC_ini
         self.SOC_final_read =SOC_final
+        self.price_API = price_API
 
     def read_spot_price(self, 
                         resample = False,
@@ -55,9 +59,22 @@ class EV_BATTERY:
         """
         Read the df of price
         """
-        df_price_spot = pd.read_csv(self.path_to_price)
+        if self.price_API :
+            # Generate the RTE token to access the data
+            self.generate_token()
 
-        self.price_ls = df_price_spot['Prix (€/MWh)']
+            # Generate the data
+            self.get_wholesale_data()
+
+            # Generate the list of price
+            self.price_ls = self.wholesale_data_df['price']
+
+        else : 
+            # Read the dataframe
+            df_price_spot = pd.read_csv(self.path_to_price)
+            # generate price list
+            self.price_ls = df_price_spot['Prix (€/MWh)']
+
         self.delta_T =1
         self.time_step = 60
         if resample :
@@ -458,8 +475,13 @@ class EV_BATTERY:
         The dataframe can be used for data visualization purpose
         """
 
-        start_price_date = datetime(2024, 6, 19, 18, 00)
-        end_price_date = datetime(2024, 6, 20, 17, 50)
+        if self.price_API:
+            start_price_date = pd.to_datetime(self.wholesale_data_df['start_date'].iloc[0])
+            end_price_date = pd.to_datetime(self.wholesale_data_df['end_date'].iloc[-1]) - timedelta(minutes=10)
+            print(f'End Date ={end_price_date}')
+        else:
+            start_price_date = datetime(2024, 6, 19, 18, 00)
+            end_price_date = datetime(2024, 6, 20, 17, 50)
 
         # Create the list of data
         date_list = []
