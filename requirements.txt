@@ -1,6 +1,7 @@
 altair==5.3.0
 appnope @ file:///Users/builder/ci_310/appnope_1642500616005/work
 asttokens @ file:///opt/conda/conda-bld/asttokens_1646925590279/work
+asyncio==3.4.3
 attrs==23.1.0
 backcall @ file:///home/ktietz/src/ci/backcall_1611930011877/work
 blinker==1.8.2
@@ -49,8 +50,10 @@ mkl-random @ file:///opt/concourse/worker/volumes/live/a9eca864-069c-4240-73c8-4
 mkl-service==2.4.0
 munkres==1.1.4
 nest-asyncio @ file:///opt/concourse/worker/volumes/live/4c28d7d6-d544-4f26-7811-eac0cb2a490e/volume/nest-asyncio_1649847935212/work
+nltk==3.8.1
 numexpr @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_f4cadb13-5662-4009-98e5-0105539d6a65fifix2d5/croots/recipe/numexpr_1656940304949/work
 numpy @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_cer8_sm247/croots/recipe/numpy_and_numpy_base_1659432720132/work
+ocpp==1.0.0
 openpyxl==3.0.10
 packaging @ file:///tmp/build/80754af9/packaging_1637314298585/work
 pandas==1.4.4
@@ -76,6 +79,7 @@ python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
 pytz @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_1caf090c-01b6-4973-adac-d2eb884a674e7zonb9eb/croots/recipe/pytz_1654762641285/work
 pyzmq @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_15f7a459-ad98-422b-b8da-cbf1f626e2115nt0ocwy/croots/recipe/pyzmq_1657724193704/work
 referencing==0.35.1
+regex==2024.5.15
 requests @ file:///private/var/folders/c_/qfmhj66j0tn016nkx_th4hxm0000gp/T/abs_fa2zrx4csg/croot/requests_1690400223595/work
 rich==13.7.1
 rpds-py==0.18.1
@@ -97,3 +101,4 @@ typing_extensions==4.12.2
 urllib3 @ file:///private/var/folders/sy/f16zz6x50xz3113nwtb9bvq00000gp/T/abs_62orwr3pr2/croot/urllib3_1698257564351/work
 watchdog==4.0.1
 wcwidth @ file:///Users/ktietz/demo/mc3/conda-bld/wcwidth_1629357192024/work
+websockets==12.0
