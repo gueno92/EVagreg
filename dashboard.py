@@ -4,8 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import time
 from datetime import datetime, timedelta
-from EV_class import EV_BATTERY
-from RTE_API import RTE_API
+from src.EV_class import EV_BATTERY
+from src.RTE_API import RTE_API
 import plotly.express as px
 import plotly.graph_objects as go
 

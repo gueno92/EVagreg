@@ -4,7 +4,7 @@ from gurobipy import Model, GRB, quicksum
 import matplotlib.pyplot as plt
 import random
 from datetime import datetime, timedelta
-from RTE_API import *
+from src.RTE_API import *
 
 class EV_BATTERY(RTE_API):
     

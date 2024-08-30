@@ -1,4 +1,3 @@
-INL/MIS-11-21904
 TerritoryName,ReportingPeriod,numVins,TotTripsThisMonth,TotDistThisMonth,AvgTripDistance,AvgDistPerDay,AvgNumChargingEventsBetweenTrips,AvgDistanceBetweenChargingEvents,AvgNumChargingEventsPerVehiclePerDay,TotChrgHome,TotChrgLevel2Away,TotChrgUnk,PctTotChrgHome,PctTotChrgLevel2Away,PctTotChrgUnk
 ALL,October 2013 through December 2013,3499,781062,5258445.175,6.732,26.65054241780742,3.552,23.915,1.114,164230.000,44369.000,11286.000,74.689,20.178,5.133
 "Atlanta, GA Metropolitan Area",October 2013 through December 2013,114,25799,179065.508,6.941,26.73816753770344,3.427,23.783,1.124,5802.000,1134.000,593.000,77.062,15.062,7.876

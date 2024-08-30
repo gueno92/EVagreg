@@ -1,0 +1,11 @@
+Bqu4D2!rnAZqZrg
+
+https://digital.iservices.rte-france.com/open_api/wholesale_market/v2
+
+/open_api/wholesale_market/v2/sandbox/france_power_exchanges
+
+
+OGIwYzljYTQtOGExYi00ZGJmLTlmZmEtYzBmODU0M2NjZDVmOjkxOWY3ODA1LTZkNDQtNDJkYi04NmE3LWVjY2M5NWRkNjFhYg==
+
+GET /balancing_energy/v3/prices?start_date=2016-07-06T00:00:00%2B02:00&end_date=2016-07-07T00:00:00%2B02:00
+GET /balancing_energy/v3/prices?start_date=2025-07-06T00:00:00%2B02:00&end_date=2025-07-07T00:00:00%2B02:00
